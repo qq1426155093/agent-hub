@@ -8,7 +8,7 @@ Agent Hub 为不同 AI Agent 提供统一入口：服务注册后，管理员配
 
 ## 核心能力
 
-- **服务注册与发现**：管理 Agent 服务实例、在线状态和租约。
+- **服务注册与发现**：通过 Nacos 发现 Agent 服务实例，管理平台准入和状态有效期。
 - **Agent 管理与配置**：维护 Agent ID、能力描述、服务绑定及启用状态。
 - **统一调用入口**：客户端指定 Agent，平台完成路由、会话绑定和调用转发。
 - **现成 Agent 封装**：通过 Daemon 内部适配器，将 Codex、Claude 等 Agent 包装成服务。
@@ -22,7 +22,7 @@ Agent Hub 为不同 AI Agent 提供统一入口：服务注册后，管理员配
 
 | 程序 | 职责 |
 | --- | --- |
-| `agent-manager` | 管理服务注册、实例租约、Agent 定义与能力配置，发布路由信息 |
+| `agent-manager` | 通过 Nacos 发现和纳管服务，使用 MySQL 管理 Agent 与能力配置，提供 React 管理界面并发布路由 |
 | `agent-dispatch` | 订阅路由，接受客户端调用，维护平台会话和实例绑定，转发请求与执行事件 |
 | `agent-daemon` | 作为 Agent 服务实例，封装现成 Agent，管理原生会话、执行过程和工作区 |
 
@@ -31,8 +31,9 @@ flowchart LR
     Admin[管理员] -->|Agent 配置| Manager[agent-manager]
     Manager -->|路由订阅| Dispatch[agent-dispatch]
     Client[客户端] -->|指定 Agent 调用| Dispatch
-    Daemon[agent-daemon] -->|注册 / 心跳| Manager
-    ThirdParty[第三方 Agent 服务] -->|注册 / 心跳| Manager
+    Daemon[agent-daemon] -->|实例注册与存活维护| Nacos[Nacos]
+    ThirdParty[第三方 Agent 服务] -->|实例注册与存活维护| Nacos
+    Manager -->|服务发现与订阅| Nacos
     Dispatch -->|标准调用协议| Daemon
     Dispatch -->|标准调用协议| ThirdParty
     Daemon --> Runtime[Codex / Claude 等 Agent]
@@ -42,10 +43,13 @@ Daemon 是标准协议的一种服务实现，直接接受 Dispatch 调用。第
 
 基本路由关系为 `agent-id → agent-service-name → 服务实例`。首版会话绑定执行实例，平台聊天记录、原生 Agent 会话和工作区分别管理。详细职责和故障边界见[架构设计](docs/architecture.md)。
 
+Manager 采用 MySQL、Nacos 2.3.2 和 React 管理界面，本地调试可使用 rnacos。实例直接注册 Nacos、Manager 订阅纳管是本轮设计建议，尚待确认；详细方案见 [Manager 设计草案](docs/agent-manager-design.md)。
+
 ## 文档
 
 - [文档导航](docs/README.md)：阅读顺序与文档维护约定。
 - [架构设计](docs/architecture.md)：组件职责、核心概念、主要流程与状态归属。
+- [Manager 详细设计](docs/agent-manager-design.md)：MySQL、Nacos、React 管理界面、双来源能力描述与路由发布草案。
 - [首版范围与实施计划](docs/roadmap.md)：功能边界、实施阶段与验收方向。
 - [标准协议设计范围](docs/protocol-design.md)：后续协议设计议题，具体协议尚未制定。
 - [贡献指南](AGENTS.md)：项目组织、开发风格、测试与提交约定。
